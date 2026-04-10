@@ -15,7 +15,7 @@ This project analyzes e-commerce user behavior data (view, cart, purchase) and o
 | orders | Order data (order_id, user_id, amount, order_time) |
 | order_items | Order details (order_id, product_id, quantity) |
 | products | Product information (product_id, category, price) |
-| ab_test | A/B testing data (user_id, experiment_group, is_exposed, is_clicked, is_purchased, revenue |
+| ab_test | A/B testing data (user_id, experiment_group, is_exposed, is_clicked, is_purchased, revenue) |
 
 ---
 
