@@ -13,9 +13,9 @@ This project analyzes e-commerce user behavior data (view, cart, purchase) and o
 | users | User registration data (user_id, register_date) |
 | user_behavior | User activity logs (view / cart / purchase) |
 | orders | Order data (order_id, user_id, amount, order_time) |
-| order_items | Order details |
-| products | Product information |
-| ab_test | A/B testing data |
+| order_items | Order details (order_id, product_id, quantity) |
+| products | Product information (product_id, category, price) |
+| ab_test | A/B testing data (user_id, experiment_group, is_exposed, is_clicked, is_purchased, revenue |
 
 ---
 
@@ -153,7 +153,7 @@ Insight:
 - Moderate Day 1 retention  
 - Significant drop in Day 7 retention  
 
-👉  Indicates weak long-term user engagement  
+  Indicates weak long-term user engagement  
 
 ---
 
@@ -162,7 +162,7 @@ Insight:
 - Lower conversion rates compared to returning users  
 - Retention drop is concentrated in early-stage users  
 
-👉  Growth issue is essentially a **new user problem**
+ Growth issue is essentially a **new user problem**
 
 ---
 
