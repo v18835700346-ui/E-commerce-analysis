@@ -217,9 +217,6 @@ This project builds a complete e-commerce analytics framework and identifies bus
 ### User Growth
 ![growth](images/growth.png)
 
-### Retention
-![retention](images/retention.png)
-
 ### Funnel
 ![funnel](images/funnel.png)
 
