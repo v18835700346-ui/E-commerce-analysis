@@ -1,224 +1,117 @@
-#  E-commerce User Behavior & Conversion Analysis (SQL)
+# AI Product Activation & Retention Growth Analysis
 
-## 1. Project Background
+An end-to-end simulated growth analytics project for an AI assistant with chat, writing, image-generation and document-analysis features. The project starts with a tracking plan, validates event quality, diagnoses activation and retention, segments users and evaluates an onboarding experiment.
 
-This project analyzes e-commerce user behavior data (view, cart, purchase) and order data to build a comprehensive analytics framework. The goal is to identify key growth bottlenecks and provide data-driven optimization insights.
+> The dataset is synthetic and reproducible. All business results below are simulated for analytical practice rather than claims about a real product.
 
----
+## Business question
 
-## 2. Data Description
+New-user acquisition is growing, but not every registered user reaches the product's core value. The project asks:
 
-| Table | Description |
-|------|-------------|
-| users | User registration data (user_id, register_date) |
-| user_behavior | User activity logs (view / cart / purchase) |
-| orders | Order data (order_id, user_id, amount, order_time) |
-| order_items | Order details (order_id, product_id, quantity) |
-| products | Product information (product_id, category, price) |
-| ab_test | A/B testing data (user_id, experiment_group, is_exposed, is_clicked, is_purchased, revenue) |
+1. Where do new users drop before receiving their first useful AI result?
+2. Which acquisition channels and first-use behaviors are associated with stronger retention?
+3. Can personalized onboarding increase activation without harming retention or payment conversion?
+4. How should users be segmented for activation, engagement and reactivation operations?
 
----
+## Growth framework
 
-## 3. Analytical Framework
+**North-star metric:** weekly users who complete at least two successful AI tasks.
 
-The project covers the following analytical modules:
+**24-hour activation:** a registered user receives at least one server-confirmed `result_success` within 24 hours.
 
-1. User Growth & Activity (New Users, DAU)  
-2. User Retention (Day 1, Day 7)  
-3. Conversion Funnel (view  →  cart  →  purchase)  
-4. Revenue Analysis (GMV, ARPPU)  
-5. User Lifecycle Analysis  
-6. User Value Analysis (RFM Model)  
-7. A/B Testing Analysis  
-8. User Segmentation (New vs Returning Users)  
+The analysis separates the guided activation journey from the commercial journey:
 
----
+```text
+Registration -> onboarding -> core task -> successful result
+Successful result -> retained use -> paywall -> subscription
+```
 
-## 4. Key Analysis
+The full definitions, event ownership and data-quality rules are documented in [tracking_plan.md](tracking_plan.md).
 
-### 4.1 User Growth & Activity
+## Data model
 
-DAU shows a consistent upward trend, indicating that the platform is in a growth phase with increasing user engagement.
+| Table | Grain | Main fields |
+|---|---|---|
+| `users` | One row per user | registration time, channel, device, city tier, referrer |
+| `events` | One row per event | event name/time, session, feature, status, latency, app version |
+| `ab_assignments` | One row per user and experiment | assignment time and experiment group |
+| `subscriptions` | One row per successful subscription | payment time, plan and revenue |
 
----
+The generator creates 20,000 users, 313,894 product events and 625 subscriptions across a 90-day observation period. Recent cohorts are deliberately right-censored so retention queries must exclude incomplete windows.
 
-### 4.2 User Retention
+## Verified findings
 
-- Day 1 retention: moderate (approximately 30%–70%)  
-- Day 7 retention: significantly lower  
+### Activation journey
 
-Insight:
-- Users are attracted initially but fail to retain long-term  
-- Indicates insufficient product stickiness  
+Among users with a complete 24-hour observation window:
 
----
+- 71.7% completed onboarding.
+- 61.0% of onboarding completers submitted a core task through the guided path.
+- 90.1% of guided-path task submitters received a successful result.
 
-### 4.3 Conversion Funnel
+The largest controllable loss occurs before task submission, so feature selection and first-use guidance are stronger initial levers than result delivery reliability.
 
-view  →  cart  →  purchase
+![Activation funnel](images/activation_funnel.svg)
 
-Conversion rates:
+### Acquisition quality
 
-- View  →  Cart  ≈  86%  
-- Cart  →  Purchase  ≈  77%  
+Referral users had the strongest 24-hour activation rate at 56.7%, while paid-social users had the largest volume but the weakest activation rate at 45.5%. This suggests channel evaluation should use downstream activation and retention, not registrations alone.
 
-Insight:
+### Onboarding experiment
 
-- Conversion funnel performs exceptionally well  
-- No significant drop-off across stages  
-- **Conversion is not the primary issue**
+Control A used the default homepage. Treatment B asked users to select a goal and then recommended a matching feature template.
 
----
+| Metric | A | B | Absolute lift | p-value | Interpretation |
+|---|---:|---:|---:|---:|---|
+| 24-hour activation | 48.24% | 53.17% | +4.94 pp | <0.001 | Significant improvement |
+| D7 retained use | 14.76% | 16.06% | +1.30 pp | 0.0145 | Significant overall improvement |
+| D7 retention among activated users | 27.06% | 27.30% | +0.24 pp | 0.7902 | No evidence of deeper retention improvement |
+| Seven-day payment | 2.65% | 2.57% | -0.09 pp | 0.7168 | No meaningful difference |
 
-### 4.4 Revenue Analysis
+The sample-ratio-mismatch check passed (`p=0.4883`). The experiment increased the number of users reaching first value, which lifted overall D7 retained use, but it did not improve retention conditional on activation or short-term payment. A follow-up experiment should focus on the second successful use case rather than adding more onboarding steps.
 
-- GMV shows a steady upward trend  
-- ARPPU is also increasing  
+![Experiment outcomes](images/experiment_outcomes.svg)
 
-Insight:
+## Growth recommendations
 
-- Revenue growth is stable  
-- User monetization capability is improving  
+1. Roll out personalized onboarding while continuing to monitor result failures and payment conversion as guardrails.
+2. Add a post-activation recommendation that introduces a second relevant use case; evaluate retained successful use rather than app opens.
+3. Optimize paid-social targeting and landing-message consistency using 24-hour activation as a channel-quality metric.
+4. Test a result-sharing referral loop because referral users show the strongest downstream quality.
+5. Trigger scenario-based reminders for activated users who have not completed a second successful task within three days.
 
----
+## Repository structure
 
-### 4.5 User Lifecycle Analysis
+```text
+generate_data.py       Synthetic users, event logs, subscriptions and experiment assignment
+validate_data.py       Tracking integrity and event-order checks
+schema.sql             MySQL 8.0 table definitions
+growth_analysis.sql    North star, funnel, channel, cohort, lifecycle and RFE analysis
+ab_analysis.py         SRM, confidence intervals and two-proportion tests
+build_outputs.py       Dashboard extracts and GitHub preview charts
+tracking_plan.md       Metric definitions, event dictionary and QA rules
+outputs/               Tableau-ready summary tables
+legacy/                Previous e-commerce project retained for reference on this branch
+```
 
-Identified:
+## Run locally
 
-- Continuously active users  
-- Returning users  
-- Silent users  
-
-Used to understand user engagement patterns and churn behavior  
-
----
-
-### 4.6 User Value Analysis (RFM)
-
-- High-value users (F  ≥  3 & M  ≥  500): **489 users**
-
-Insight:
-
-- A solid base of high-value users supports revenue growth  
-- User structure is relatively healthy  
-
----
-
-### 4.7 A/B Testing Analysis
-
-| Group | CTR | CVR |
-|------|-----|-----|
-| A | 0.8408 | 0.6564 |
-| B | 0.8571 | 0.6684 |
-
-Insight:
-
-- Group B outperforms Group A in both CTR and CVR  
-- Indicates that the optimization strategy is effective  
-
----
-
-### 4.8 User Segmentation (New vs Returning Users)
-
-- New users show lower conversion compared to returning users  
-- Returning users behave more consistently  
-
-Insight:
-
-- New users are the key segment for improvement  
-
----
-
-## 5. Key Findings  
-
-### 1.Overall Growth is Healthy
-
-- DAU and GMV are both increasing  
-- High-value users (489) contribute significantly to revenue  
-
----
-
-### 2.Conversion Funnel is Strong
-
-- Conversion rates are significantly higher than typical benchmarks  
-- No major bottlenecks in the conversion process  
-
-**Conclusion: The issue is NOT conversion**
-
----
-
-### 3.Retention is the Core Problem
-
-- Moderate Day 1 retention  
-- Significant drop in Day 7 retention  
-
-  Indicates weak long-term user engagement  
-
----
-
-### 4.New Users are the Main Bottleneck
-
-- Lower conversion rates compared to returning users  
-- Retention drop is concentrated in early-stage users  
-
- Growth issue is essentially a **new user problem**
-
----
-
-### 5. A/B Testing Confirms Optimization Direction
-
-- Group B shows improvement in both CTR and CVR  
-- Validates effectiveness of optimization strategies  
-
----
-
-###    Final Conclusion
-
-**The main issue lies in user retention, especially among new users, rather than the conversion process. Improving new user experience and long-term engagement is critical for growth.**
-
----
-
-## 6. Recommendations
-
-1. Improve onboarding experience for new users (increase Day 1 retention)  
-2. Enhance product discovery and recommendation systems  
-3. Strengthen user engagement mechanisms (e.g., promotions, notifications)  
-4. Simplify user journey and reduce friction  
-5. Apply user segmentation for targeted operations  
-
----
-
-## 7. Project Summary
-
-This project builds a complete e-commerce analytics framework and identifies business bottlenecks through:
-
-- Retention & funnel combined analysis  
-- User segmentation  
-- A/B testing validation  
-
-### Key Skills Demonstrated:
-
-- SQL-based data analysis  
-- User behavior analysis  
-- Business problem diagnosis  
-- Data-driven decision making  
-
----
-
-## 8. Tech Stack
-
-- SQL (MySQL)  
-- Excel  
-- Tableau (used for exploratory analysis, not primary output)
-
-##    Dashboard Preview
-
-### User Growth
-![growth](images/growth.png)
-
-### Funnel
-![funnel](images/funnel.png)
-
-### Revenue
-![revenue](images/revenue.png)
+```bash
+python -m pip install -r requirements.txt
+python generate_data.py
+python validate_data.py
+python ab_analysis.py
+python build_outputs.py
+```
+
+The generated CSV files are intentionally excluded from version control. Running `generate_data.py` with the fixed seed reproduces the analyzed dataset.
+
+## Skills demonstrated
+
+- Product tracking design and data-quality validation
+- Activation funnel and time-to-first-value analysis
+- Cohort retention with complete observation windows
+- Acquisition-channel quality and lifecycle segmentation
+- RFE-based user value segmentation
+- A/B experiment design, SRM checks and significance testing
+- SQL, Python, pandas, SciPy and dashboard-data preparation
