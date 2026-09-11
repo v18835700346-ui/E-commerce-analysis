@@ -91,7 +91,6 @@ ab_analysis.py         SRM, confidence intervals and two-proportion tests
 build_outputs.py       Dashboard extracts and GitHub preview charts
 tracking_plan.md       Metric definitions, event dictionary and QA rules
 outputs/               Tableau-ready summary tables
-legacy/                Previous e-commerce project retained for reference on this branch
 ```
 
 ## Run locally
