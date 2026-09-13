@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 from scipy.stats import chi2, norm
+from validate_data import verify_snapshot
 
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -17,7 +18,7 @@ def two_proportion_test(success_a: int, n_a: int, success_b: int, n_b: int) -> d
     pooled = (success_a + success_b) / (n_a + n_b)
     pooled_se = sqrt(pooled * (1 - pooled) * (1 / n_a + 1 / n_b))
     z_score = (rate_b - rate_a) / pooled_se
-    p_value = 2 * (1 - norm.cdf(abs(z_score)))
+    p_value = 2 * norm.sf(abs(z_score))
 
     unpooled_se = sqrt(rate_a * (1 - rate_a) / n_a + rate_b * (1 - rate_b) / n_b)
     delta = rate_b - rate_a
@@ -36,6 +37,8 @@ def two_proportion_test(success_a: int, n_a: int, success_b: int, n_b: int) -> d
 
 
 def main() -> None:
+    verify_snapshot(DATA_DIR)
+    (DATA_DIR.parent / "outputs").mkdir(exist_ok=True)
     users = pd.read_csv(DATA_DIR / "users.csv", parse_dates=["register_time"])
     events = pd.read_csv(DATA_DIR / "events.csv", parse_dates=["event_time"])
     assignments = pd.read_csv(DATA_DIR / "ab_assignments.csv", parse_dates=["assigned_at"])
@@ -64,7 +67,8 @@ def main() -> None:
     base["first_payment_time"] = base["user_id"].map(first_payment)
     base["paid_7d"] = base["first_payment_time"].le(base["register_time"] + pd.Timedelta(days=7))
 
-    observed_24h = base.loc[base["register_time"] <= ANALYSIS_END - pd.Timedelta(hours=24)]
+    # Use the same mature registration cohort across all reported experiment metrics.
+    observed_24h = base.loc[base["register_time"] <= ANALYSIS_END - pd.Timedelta(days=7)]
     observed_7d = base.loc[base["register_time"] <= ANALYSIS_END - pd.Timedelta(days=7)]
 
     def evaluate(frame: pd.DataFrame, metric: str) -> dict:
@@ -81,12 +85,25 @@ def main() -> None:
     }
 
     print(f"SRM p-value: {srm_p_value:.4f}")
+    first_day_results = events.loc[events.event_name.isin(["result_success", "result_failed"])].merge(
+        observed_24h[["user_id", "register_time"]], on="user_id"
+    )
+    first_day_results = first_day_results.loc[
+        first_day_results.event_time <= first_day_results.register_time + pd.Timedelta(hours=24)
+    ]
+    print("Task failure rates (descriptive):", first_day_results.assign(
+        failed=first_day_results.event_name.eq("result_failed")
+    ).groupby("experiment_group").failed.mean().to_dict())
     for metric, result in results.items():
         print(
             f"{metric}: A={result['rate_a']:.2%}, B={result['rate_b']:.2%}, "
             f"lift={result['absolute_lift']:.2%} ({result['relative_lift']:.1%}), "
-            f"95% CI=[{result['ci_low']:.2%}, {result['ci_high']:.2%}], p={result['p_value']:.4f}"
+            f"95% CI=[{result['ci_low']:.2%}, {result['ci_high']:.2%}], p={result['p_value']:.6g}"
         )
+    verify_snapshot(DATA_DIR)
+    pd.DataFrame(results).T.to_csv(DATA_DIR.parent / "outputs" / "ab_statistics.csv", index_label="metric")
+    print("Activated-only comparisons are descriptive: activation is a post-treatment selection.")
+    print("Secondary p-values are exploratory and unadjusted. Non-significance does not establish equivalence.")
 
     first_value_minutes = (
         observed_24h.loc[observed_24h["activated_24h"]]

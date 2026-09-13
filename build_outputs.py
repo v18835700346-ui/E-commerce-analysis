@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from validate_data import verify_snapshot
 
 
 ROOT = Path(__file__).parent
@@ -26,9 +27,22 @@ def first_event(events: pd.DataFrame, event_name: str) -> pd.Series:
 
 
 def main() -> None:
+    verify_snapshot(DATA_DIR)
     OUTPUT_DIR.mkdir(exist_ok=True)
     IMAGE_DIR.mkdir(exist_ok=True)
     users, events, assignments, subscriptions = load_data()
+    verify_snapshot(DATA_DIR)
+    success = events.loc[events.event_name.eq("result_success")]
+    profile = users[["user_id"]].copy()
+    profile["first"] = profile.user_id.map(success.groupby("user_id").event_time.min())
+    profile["last"] = profile.user_id.map(success.groupby("user_id").event_time.max())
+    profile["segment"] = "dormant"
+    profile.loc[profile["last"] >= ANALYSIS_END - pd.Timedelta(days=14), "segment"] = "at_risk"
+    profile.loc[profile["last"] >= ANALYSIS_END - pd.Timedelta(days=7), "segment"] = "active"
+    profile.loc[profile["first"] >= ANALYSIS_END - pd.Timedelta(days=7), "segment"] = "newly_activated"
+    profile.loc[profile["first"].isna(), "segment"] = "never_activated"
+    assert profile.user_id.is_unique and len(profile) == len(users)
+    profile.groupby("segment").size().rename("users").to_csv(OUTPUT_DIR / "lifecycle_segments.csv")
 
     eligible_24h = users.loc[users["register_time"] <= ANALYSIS_END - pd.Timedelta(days=1)].copy()
     eligible_7d = users.loc[users["register_time"] <= ANALYSIS_END - pd.Timedelta(days=7)].copy()

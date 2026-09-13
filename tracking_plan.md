@@ -14,7 +14,7 @@ The product is a simulated AI assistant offering chat, writing, image generation
 | First-value time | Time from `register_success` to the first `result_success` |
 | 7-day payment conversion | Successful subscription within seven days after registration |
 
-Retention uses successful results rather than app opens so that the metric represents value received, not superficial activity.
+These are registration-cohort effective-use rates; D7 may include a user's first successful use. Activated-user return rates are separate descriptive measures. A server success is a proxy for value, not proof of satisfaction. The twice-per-week north star is a proposed threshold, not empirically validated.
 
 ## Event dictionary
 
@@ -36,7 +36,7 @@ Retention uses successful results rather than app opens so that the metric repre
 
 ## Common properties
 
-Every event contains `event_id`, `user_id`, `anonymous_id`, `session_id`, `event_time`, `app_version`, `experiment_id` and `experiment_group`. Anonymous and registered IDs are both retained to support identity stitching.
+Every event contains `event_id`, `user_id`, `anonymous_id`, `session_id`, `event_time`, `app_version`, `experiment_id` and `experiment_group`. Task submissions and results also contain `task_id`. Channel and device are joined from users; plan and amount from subscriptions. Anonymous IDs are reserved fields only: pre-registration events and identity stitching are not implemented.
 
 ## Data-quality controls
 
@@ -46,7 +46,7 @@ Every event contains `event_id`, `user_id`, `anonymous_id`, `session_id`, `event
 4. Registration must precede all product events; task submission must precede its result.
 5. Client clicks and server-confirmed successes are separate events. Activation uses the server event.
 6. Cohorts that have not completed the observation window are excluded from D1, D3 and D7 denominators.
-7. App-version and tracking changes are monitored for discontinuities before and after release.
+7. App-version discontinuity monitoring is a proposed future control, not implemented.
 
 ## Experiment
 
@@ -56,3 +56,14 @@ Every event contains `event_id`, `user_id`, `anonymous_id`, `session_id`, `event
 - Secondary metrics: D7 retained-task rate and seven-day payment conversion.
 - Guardrails: result failure rate and median first-value time.
 - Checks: 50/50 sample-ratio mismatch test, mutually exclusive assignment, complete observation windows, two-proportion tests and 95% confidence intervals.
+
+## Simulation limitations
+
+Both groups have a basic onboarding flow; B adds interest selection and recommended templates.
+All probabilities are explicit modeling assumptions, including treatment and channel effects.
+They are not evidence that these effects exist in a real product. The seed is fixed, not searched for significance.
+20,000 users is a demonstration sample, not a completed prospective power calculation.
+The experiment uses all assigned users with seven complete days of observation.
+Secondary p-values are exploratory and unadjusted. Activated-only and time-to-value among activated users are post-treatment selected comparisons, not causal estimates.
+Paywall events currently exist only for purchasers; paywall-to-payment conversion cannot be estimated from this dataset.
+Data is simulated after registration only. Full subscription renewal, referral-loop conversion and live tracking deployment are out of scope.

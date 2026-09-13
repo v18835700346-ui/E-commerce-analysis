@@ -3,10 +3,7 @@
 create database if not exists ai_product_growth;
 use ai_product_growth;
 
-drop table if exists subscriptions;
-drop table if exists events;
-drop table if exists ab_assignments;
-drop table if exists users;
+-- Run in an empty database. Existing tables are never dropped automatically.
 
 create table users (
     user_id varchar(16) primary key,
@@ -31,6 +28,7 @@ create table ab_assignments (
 
 create table events (
     event_id varchar(20) primary key,
+    task_id varchar(20) null,
     user_id varchar(16) not null,
     anonymous_id varchar(16) not null,
     session_id varchar(24) not null,

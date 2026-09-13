@@ -85,7 +85,7 @@ user_metrics as (
 paid as (
     select
         u.user_id,
-        max(s.subscription_time <= u.register_time + interval 7 day) as paid_7d
+        coalesce(max(s.subscription_time <= u.register_time + interval 7 day), 0) as paid_7d
     from eligible u
     left join subscriptions s on u.user_id = s.user_id
     group by u.user_id
@@ -160,6 +160,7 @@ from first_success f
 join users u on f.user_id = u.user_id
 left join active_d7 a on f.user_id = a.user_id
 where u.register_time <= @analysis_end - interval 7 day
+  and f.event_time <= u.register_time + interval 1 day
 group by f.feature_type
 order by users desc;
 
@@ -169,7 +170,7 @@ with success_profile as (
         u.user_id,
         min(e.event_time) as first_success_time,
         max(e.event_time) as last_success_time,
-        sum(e.event_time >= @analysis_end - interval 30 day) as successful_tasks_30d
+        coalesce(sum(e.event_time >= @analysis_end - interval 30 day), 0) as successful_tasks_30d
     from users u
     left join events e
       on u.user_id = e.user_id
@@ -207,9 +208,9 @@ with user_rfe as (
 scored as (
     select
         *,
-        ntile(4) over(order by recency_days desc) as r_score,
-        ntile(4) over(order by frequency_30d) as f_score,
-        ntile(4) over(order by feature_breadth_30d) as e_score
+        case when recency_days <= 3 then 4 when recency_days <= 7 then 3 when recency_days <= 14 then 2 else 1 end as r_score,
+        case when frequency_30d >= 12 then 4 when frequency_30d >= 6 then 3 when frequency_30d >= 3 then 2 else 1 end as f_score,
+        least(feature_breadth_30d, 4) as e_score
     from user_rfe
 )
 select

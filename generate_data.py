@@ -1,6 +1,8 @@
 """Generate a reproducible event-level dataset for an AI assistant growth case."""
 
 from pathlib import Path
+import hashlib
+import json
 
 import numpy as np
 import pandas as pd
@@ -49,7 +51,12 @@ def main() -> None:
 
     referral_mask = users["channel"].eq("referral")
     referral_count = int(referral_mask.sum())
-    users.loc[referral_mask, "referrer_user_id"] = rng.choice(users.loc[~referral_mask, "user_id"], referral_count)
+    for idx in users.index[referral_mask]:
+        candidates = users.loc[(~referral_mask) & (users.register_time < users.at[idx, "register_time"]), "user_id"]
+        if len(candidates):
+            users.at[idx, "referrer_user_id"] = rng.choice(candidates)
+        else:
+            users.at[idx, "channel"] = "organic"
 
     assignments = pd.DataFrame(
         {
@@ -63,6 +70,7 @@ def main() -> None:
     events: list[dict] = []
     subscriptions: list[dict] = []
     event_seq = 1
+    active_tasks = {}
 
     def add_event(
         user_idx: int,
@@ -74,9 +82,14 @@ def main() -> None:
         latency_ms: int | str = "",
     ) -> None:
         nonlocal event_seq
+        if event_time > END_DATE:
+            return
+        if event_name == "task_submit":
+            active_tasks[user_idx] = f"t{event_seq:09d}"
         events.append(
             {
                 "event_id": f"e{event_seq:09d}",
+                "task_id": active_tasks.get(user_idx, "") if event_name in ("task_submit", "result_success", "result_failed") else "",
                 "user_id": users.at[user_idx, "user_id"],
                 "anonymous_id": users.at[user_idx, "anonymous_id"],
                 "session_id": f"s{user_idx + 1:06d}_{session_no:02d}",
@@ -163,12 +176,12 @@ def main() -> None:
             if activated
             else 0.025 + 0.018 * max(quality, -1)
         )
-        for day in range(1, 31):
+        for day in range(1, (END_DATE.normalize() - reg.normalize()).days + 1):
             event_day = reg.normalize() + pd.Timedelta(days=day)
             if event_day > END_DATE.normalize():
                 break
             decay = (0.18 if activated else 0.045) * np.exp(-day / 6.5)
-            milestone = (0.06 if activated else 0.015) if day in (1, 3, 7) else 0
+            milestone = 0
             p_return = clipped_probability(retention_base + decay + milestone)
             if rng.random() < p_return:
                 session_no += 1
@@ -227,6 +240,9 @@ def main() -> None:
     assignments.to_csv(DATA_DIR / "ab_assignments.csv", index=False)
     events_df.to_csv(DATA_DIR / "events.csv", index=False)
     subscriptions_df.to_csv(DATA_DIR / "subscriptions.csv", index=False)
+    manifest = {name: hashlib.sha256((DATA_DIR / name).read_bytes()).hexdigest()
+                for name in ("users.csv", "ab_assignments.csv", "events.csv", "subscriptions.csv")}
+    (DATA_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     print(f"users={len(users):,}")
     print(f"events={len(events_df):,}")

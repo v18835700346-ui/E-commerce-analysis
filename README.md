@@ -37,7 +37,7 @@ The full definitions, event ownership and data-quality rules are documented in [
 | `ab_assignments` | One row per user and experiment | assignment time and experiment group |
 | `subscriptions` | One row per successful subscription | payment time, plan and revenue |
 
-The generator creates 20,000 users, 313,894 product events and 625 subscriptions across a 90-day observation period. Recent cohorts are deliberately right-censored so retention queries must exclude incomplete windows.
+The generator creates 20,000 users, 438,214 product events and 654 subscriptions across a 90-day observation period. Each user's activity is simulated through the observation cutoff, not truncated after 30 days. Recent cohorts are right-censored and excluded from incomplete observation windows.
 
 ## Verified findings
 
@@ -45,17 +45,17 @@ The generator creates 20,000 users, 313,894 product events and 625 subscriptions
 
 Among users with a complete 24-hour observation window:
 
-- 71.7% completed onboarding.
+- 71.2% completed onboarding.
 - 61.0% of onboarding completers submitted a core task through the guided path.
-- 90.1% of guided-path task submitters received a successful result.
+- 90.2% of guided-path task submitters received a successful result.
 
-The largest controllable loss occurs before task submission, so feature selection and first-use guidance are stronger initial levers than result delivery reliability.
+The largest relative step loss is between onboarding completion and task submission. Feature-selection friction is a hypothesis, not an established cause. The final ratio is user-level guided-path completion, not per-task technical reliability.
 
 ![Activation funnel](images/activation_funnel.svg)
 
 ### Acquisition quality
 
-Referral users had the strongest 24-hour activation rate at 56.7%, while paid-social users had the largest volume but the weakest activation rate at 45.5%. This suggests channel evaluation should use downstream activation and retention, not registrations alone.
+Referral users had 59.1% activation versus 44.9% for paid-social users in this simulated sample. Channel differences are partly encoded in the generator and illustrate downstream quality analysis, not a real-world allocation recommendation.
 
 ### Onboarding experiment
 
@@ -63,21 +63,21 @@ Control A used the default homepage. Treatment B asked users to select a goal an
 
 | Metric | A | B | Absolute lift | p-value | Interpretation |
 |---|---:|---:|---:|---:|---|
-| 24-hour activation | 48.24% | 53.17% | +4.94 pp | <0.001 | Significant improvement |
-| D7 retained use | 14.76% | 16.06% | +1.30 pp | 0.0145 | Significant overall improvement |
-| D7 retention among activated users | 27.06% | 27.30% | +0.24 pp | 0.7902 | No evidence of deeper retention improvement |
-| Seven-day payment | 2.65% | 2.57% | -0.09 pp | 0.7168 | No meaningful difference |
+| 24-hour activation | 48.32% | 52.68% | +4.36 pp | <0.001 | Primary simulated effect |
+| D7 effective use | 11.28% | 12.64% | +1.36 pp | 0.0045 | Exploratory secondary result |
+| D7 use among activated users | 20.99% | 21.83% | +0.83 pp | 0.3293 | Descriptive, post-treatment selection |
+| Seven-day payment | 2.40% | 2.78% | +0.38 pp | 0.1034 | Inconclusive; not evidence of equivalence |
 
-The sample-ratio-mismatch check passed (`p=0.4883`). The experiment increased the number of users reaching first value, which lifted overall D7 retained use, but it did not improve retention conditional on activation or short-term payment. A follow-up experiment should focus on the second successful use case rather than adding more onboarding steps.
+The sample-ratio-mismatch test found no mismatch signal (`p=0.4883`). All experiment metrics use the same cohort with seven complete observation days. The primary activation difference has a 95% CI of +2.92 to +5.81 pp. D7 is registration-cohort effective use, including late activation. Activated-only comparisons cannot establish causal retention effects; non-significant payment results cannot establish no effect. All results reflect assumed simulation probabilities, not a deployed experiment.
 
 ![Experiment outcomes](images/experiment_outcomes.svg)
 
 ## Growth recommendations
 
-1. Roll out personalized onboarding while continuing to monitor result failures and payment conversion as guardrails.
+1. Propose a real randomized onboarding pilot with prospective sample-size planning and predefined guardrail tolerances; do not roll out based on synthetic evidence.
 2. Add a post-activation recommendation that introduces a second relevant use case; evaluate retained successful use rather than app opens.
 3. Optimize paid-social targeting and landing-message consistency using 24-hour activation as a channel-quality metric.
-4. Test a result-sharing referral loop because referral users show the strongest downstream quality.
+4. Treat result-sharing referrals as a future hypothesis; this dataset does not model the full referral funnel.
 5. Trigger scenario-based reminders for activated users who have not completed a second successful task within three days.
 
 ## Repository structure
@@ -101,9 +101,10 @@ python generate_data.py
 python validate_data.py
 python ab_analysis.py
 python build_outputs.py
+python -m unittest test_snapshot.py
 ```
 
-The generated CSV files are intentionally excluded from version control. Running `generate_data.py` with the fixed seed reproduces the analyzed dataset.
+The generated CSV files and fingerprint manifest are intentionally excluded from version control. Running `generate_data.py` with the fixed seed reproduces the analyzed dataset. Generation records SHA-256 fingerprints; validation and analysis reject changed input snapshots. Regenerate the complete dataset if a snapshot check fails.
 
 ## Skills demonstrated
 
@@ -114,3 +115,12 @@ The generated CSV files are intentionally excluded from version control. Running
 - RFE-based user value segmentation
 - A/B experiment design, SRM checks and significance testing
 - SQL, Python, pandas, SciPy and dashboard-data preparation
+
+## Validation scope
+
+Python generation, tracking validation, A/B analysis and output builds have been executed.
+MySQL queries have been reviewed but not executed against a MySQL server in this environment.
+SQL payment denominators include non-payers with zero; use the Python output as the reconciliation reference.
+Tracking checks cover task-ID ownership and sequence, experiment consistency, referral chronology and cutoff.
+Anonymous identity stitching and live tracking deployment are not implemented.
+RFE thresholds are illustrative business rules, not empirically optimized segments.
